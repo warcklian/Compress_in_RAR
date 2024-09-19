@@ -1,7 +1,7 @@
 import os
 import subprocess
 from pathlib import Path
-from tkinter import Tk, Label, Button, filedialog, StringVar, DoubleVar, Toplevel, messagebox
+from tkinter import Tk, Label, Button, filedialog, StringVar, DoubleVar, messagebox
 from threading import Thread
 
 class CompresorApp:
@@ -47,7 +47,8 @@ class CompresorApp:
     def iniciar_compresion(self):
         self.cancelar = False
         self.btn_cancelar.config(state="normal")  # Activar el botón de cancelar
-        thread = Thread(target=self.comprimir_carpeta_en_rar)  # Ejecutar la compresión en un hilo separado
+        # Ejecutar la compresión en un hilo separado para evitar bloquear la GUI
+        thread = Thread(target=self.comprimir_carpeta_en_rar)
         thread.start()
 
     def comprimir_carpeta_en_rar(self):
@@ -60,6 +61,10 @@ class CompresorApp:
         subcarpetas = [carpeta for carpeta in Path(directorio).iterdir() if carpeta.is_dir()]
 
         total = len(subcarpetas)
+        if total == 0:
+            messagebox.showinfo("Información", "No hay subcarpetas para comprimir.")
+            return
+
         for i, carpeta in enumerate(subcarpetas, 1):
             if self.cancelar:
                 break
@@ -75,12 +80,16 @@ class CompresorApp:
             
             self.nombre_archivo.set(f"Archivo: {carpeta.name}")
             try:
+                # Inicia el proceso de compresión
                 subprocess.run(comando, check=True)
-                self.progreso.set((i / total) * 100)
+                # Actualiza el porcentaje después de comprimir cada carpeta
+                porcentaje = (i / total) * 100
+                self.progreso.set(porcentaje)
+                self.root.update_idletasks()  # Actualiza la interfaz gráfica
             except subprocess.CalledProcessError as e:
                 messagebox.showerror("Error", f"Error al comprimir {carpeta}: {e}")
         
-        self.btn_cancelar.config(state="disabled")  # Desactivar el botón de cancelar al finalizar
+        self.btn_cancelar.config(state="disabled")  # Desactiva el botón de cancelar al finalizar
         self.nombre_archivo.set("Archivo: Ninguno")
         self.progreso.set(0)
     
