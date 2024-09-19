@@ -43,13 +43,11 @@ class DescompresorApp:
         self.btn_cancelar.pack(pady=10)
 
     def selecciona_directorio(self):
-        # Abre el diálogo para seleccionar el directorio
         carpeta = filedialog.askdirectory(title="Selecciona la carpeta que contiene los archivos RAR")
         if carpeta:
             self.directorio.set(carpeta)
 
     def selecciona_destino(self):
-        # Abre el diálogo para seleccionar el directorio destino
         carpeta_destino = filedialog.askdirectory(title="Selecciona la carpeta de destino")
         if carpeta_destino:
             self.destino.set(carpeta_destino)
@@ -62,8 +60,12 @@ class DescompresorApp:
         thread.start()
 
     def es_archivo_fraccionado(self, archivo):
-        # Detectar si el archivo es parte de un archivo fraccionado (part1.rar)
         return archivo.suffix == '.rar' and 'part1' in archivo.stem
+
+    def archivo_existe(self, archivo, destino):
+        # Comprobar si un archivo con el mismo nombre ya existe en la carpeta de destino y si tienen el mismo tamaño
+        archivo_destino = Path(destino) / archivo.name
+        return archivo_destino.exists() and archivo_destino.stat().st_size == archivo.stat().st_size
 
     def descomprimir_archivos_rar(self):
         directorio = self.directorio.get()
@@ -86,30 +88,21 @@ class DescompresorApp:
             if self.cancelar:
                 break
 
-            # Saltar partes adicionales si ya se ha procesado la parte principal
             if archivo in procesados:
                 continue
 
-            # Comprobar si es parte de un archivo fraccionado
-            if self.es_archivo_fraccionado(archivo):
-                # Encontrar todas las partes de este archivo fraccionado
-                partes = list(archivo.parent.glob(f"{archivo.stem[:-6]}*.rar"))  # Tomar todas las partes
-                procesados.update(partes)  # Marcar todas las partes como procesadas
+            if self.archivo_existe(archivo, destino):
+                self.nombre_archivo.set(f"Omitiendo archivo: {archivo.name} (ya existe con el mismo tamaño)")
+                continue
 
+            if self.es_archivo_fraccionado(archivo):
+                partes = list(archivo.parent.glob(f"{archivo.stem[:-6]}*.rar"))  # Tomar todas las partes
+                procesados.update(partes)
                 self.nombre_archivo.set(f"Descomprimiendo archivo fraccionado: {archivo.stem[:-6]}")
-                comando = [
-                    rar_path, 'x',  # Comando para extraer archivos
-                    str(archivo),    # Solo la parte 1 es necesaria para la descompresión
-                    destino          # Carpeta destino
-                ]
+                comando = [rar_path, 'x', '-o-', str(archivo), destino]  # Opción -o- para no sobrescribir archivos existentes
             else:
-                # Procesar archivos .rar únicos
                 self.nombre_archivo.set(f"Descomprimiendo archivo único: {archivo.name}")
-                comando = [
-                    rar_path, 'x',  # Comando para extraer archivos
-                    str(archivo),    # Archivo RAR a descomprimir
-                    destino          # Carpeta destino
-                ]
+                comando = [rar_path, 'x', '-o-', str(archivo), destino]  # Opción -o- para no sobrescribir archivos existentes
 
             try:
                 subprocess.run(comando, check=True)
